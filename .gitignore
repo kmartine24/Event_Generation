@@ -1,0 +1,19 @@
+# MadGraph install
+MG5_aMC*
+
+# compressed downloads
+*.tar.gz
+
+# event files
+*.lhe
+*.lhe.gz
+Events/
+
+# ROOT files
+*.root
+
+# detector output
+Delphes*
+
+# large outputs
+*.hepmc
