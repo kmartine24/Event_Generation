@@ -1,9 +1,11 @@
 #include <TClonesArray.h>
 #include "classes/DelphesClasses.h"
 // Mass Reconstruction Header Files
+#include <Math/VectorUtil.h>
 #include <Math/Vector4D.h>
 #include <Math/LorentzVector.h>
 #include <Math/PtEtaPhiM4D.h>
+#include <Math/Boost.h>
 // Canvas/Histogram Header Files
 #include <TFile.h>
 #include <TTree.h>
@@ -34,16 +36,20 @@ double costheta(const TLorentzVector& z1P4_input, const TLorentzVector& z2P4_inp
 }
 */
 // My cosTheta code:
-double costheta(const TLorentzVector& z1P4_input, const TLorentzVector& lepton1P4_input, const TLorentzVector& lepton2P4_input) {
-    TLorentzVector lepton1P4 = lepton1P4_input; // Lepton1
-    TLorentzVector lepton2P4 = lepton2P4_input; // Lepton2
+double costheta(const ROOT::Math::PtEtaPhiMVector& z1P4_input, const ROOT::Math::PtEtaPhiMVector& lepton1P4_input, const ROOT::Math::PtEtaPhiMVector& lepton2P4_input) {
+    ROOT::Math::PtEtaPhiMVector lepton1P4 = lepton1P4_input; // Lepton1
+    ROOT::Math::PtEtaPhiMVector lepton2P4 = lepton2P4_input; // Lepton2
 
-    TLorentzVector zP4 = lepton1P4 + lepton2P4; // Z boson recreated from leptons
+    ROOT::Math::PtEtaPhiMVector zP4 = lepton1P4 + lepton2P4; // Z boson recreated from leptons
 
-    lepton1P4.Boost(-zP4.BoostVector()); // Boost lepton1 to Z rest frame
+    ROOT::Math::Boost boostToZRestFrame(-zP4.BoostToCM());
+    auto lepton1_restcom = boostToZRestFrame(lepton1P4);
 
-    double cosTheta = lepton1P4.Vect().Dot(zP4.Vect()) /
-                      (lepton1P4.Vect().Mag() * zP4.Vect().Mag());
+    double cosTheta = ROOT::Math::VectorUtil::CosTheta(lepton1_restcom, zP4);
+    /* Trying the cosTheta function in ROOT
+    double cosTheta = lepton1_restcom.Vect().Dot(zP4.Vect()) /
+                      (lepton1_restcom.Vect().R() * zP4.Vect().R()); // No more .Mag(); use .R()
+    */
     return cosTheta;  // So cosTheta is calculated in the Z rest frame?
 }
 
@@ -82,22 +88,21 @@ int main() {
                 for (int k = j+1; k < nMuons; k++) {
                     Muon *mu1 = (Muon*) branchMuon->At(j);
 		    Muon *mu2 = (Muon*) branchMuon->At(k);
-	            
+		    
 		    // Opposite charges: 
 		    if (mu1->Charge * mu2->Charge >= 0) continue;
-
-                    // The two leptons that the Z boson decayed into:	    
+		    
+		    // The two leptons that the Z boson decayed into:	    
 		    ROOT::Math::PtEtaPhiMVector v1(mu1->PT, mu1->Eta, mu1->Phi, 0.105);
 		    ROOT::Math::PtEtaPhiMVector v2(mu2->PT, mu2->Eta, mu2->Phi, 0.105);
 		    
 		    auto Z = v1 + v2;
 		    hist_Z->Fill(Z.M());
-
-                    double cosTheta = costheta(Z, v1, v2);
+		    
+		    double cosTheta = costheta(Z, v1, v2);
 		    hist_cosTheta->Fill(cosTheta);
-
 		}
-            }
+	    }
 	}
     }
 
