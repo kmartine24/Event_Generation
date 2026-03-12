@@ -18,6 +18,7 @@
 //C++ 
 #include <algorithm>
 #include <iostream>
+#include <cmath>
 
 /* Susmita's cosTheta code: 
 double costheta(const TLorentzVector& z1P4_input, const TLorentzVector& z2P4_input, const TLorentzVector& leptonP4_input) {
@@ -36,23 +37,38 @@ double costheta(const TLorentzVector& z1P4_input, const TLorentzVector& z2P4_inp
 }
 */
 // My cosTheta code:
-double costheta(const ROOT::Math::PtEtaPhiMVector& z1P4_input, const ROOT::Math::PtEtaPhiMVector& lepton1P4_input, const ROOT::Math::PtEtaPhiMVector& lepton2P4_input) {
+double costheta(const ROOT::Math::PtEtaPhiMVector& w1P4_input, const ROOT::Math::PtEtaPhiMVector& lepton1P4_input, const ROOT::Math::PtEtaPhiMVector& lepton2P4_input) {
     ROOT::Math::PtEtaPhiMVector lepton1P4 = lepton1P4_input; // Lepton1
     ROOT::Math::PtEtaPhiMVector lepton2P4 = lepton2P4_input; // Lepton2
 
     ROOT::Math::PtEtaPhiMVector zP4 = lepton1P4 + lepton2P4; // Z boson recreated from leptons
 
     ROOT::Math::Boost boostToZRestFrame(-zP4.BoostToCM());
-    auto lepton1_restcom = boostToZRestFrame(lepton1P4);
+    auto lepton1_zframe = boostToZRestFrame(lepton1P4);
 
-    double cosTheta = ROOT::Math::VectorUtil::CosTheta(lepton1_restcom, zP4);
+    ROOT::Math::PtEtaPhiMVector wzP4 = zP4 + w1P4_input;
+    ROOT::Math::Boost boostToWZFrame(-wzP4.BoostToCM());
+    auto z_dibosonFrame = boostToWZFrame(zP4);
+    // Based on Susmita's code, I need to include the W boson, and then boost the Z lepton to the WZ rest frame
+
+    double cosTheta = ROOT::Math::VectorUtil::CosTheta(lepton1_zframe, z_dibosonFrame);
     /* Trying the cosTheta function in ROOT
     double cosTheta = lepton1_restcom.Vect().Dot(zP4.Vect()) /
                       (lepton1_restcom.Vect().R() * zP4.Vect().R()); // No more .Mag(); use .R()
     */
-    return cosTheta;  // So cosTheta is calculated in the Z rest frame?
+    return cosTheta;  // cosTheta is calculated in the Z rest frame
 }
 
+double calculateW_MT (double lepton_phi, double lepton_pt, double met, double metphi) {
+    double dphi = std::abs(lepton_phi - metphi);
+    // Check dphi is in the range [0, pi]
+    if (dphi > M_PI) dphi = 2*M_PI - dphi;
+
+    // Transverse mass equation: sqrt(2* lepton_pt * MET * (1- cos dphi)
+    double W_mt = std::sqrt(2.0*lepton_pt * met * (1.0 - std::cos(dphi)));
+
+    return W_mt;
+}
 
 int main() {
 
@@ -66,15 +82,21 @@ int main() {
     std::cout << "2) Branches found" << std::endl;
     TClonesArray *branchMuon = 0;
     tree->SetBranchAddress("Muon", &branchMuon);
+    TClonesArray *branchElectron = 0;
+    tree->SetBranchAddress("Electron", &branchElectron);
+    TClonesArray *branchMissingET = 0;
+    tree->SetBranchAddress("MissingET", &branchMissingET);
 
     //Create a canvas to put plots onto
     TCanvas *c1 = new TCanvas("c1", "Canvas", 1200, 1000);
-    TCanvas *c2 = new TCanvas("c3", "Canvas", 1200, 1000);
+    TCanvas *c2 = new TCanvas("c2", "Canvas", 1200, 1000);
+    TCanvas *c3 = new TCanvas("c3", "Canvas", 1200, 1000);
     std::cout << "3) Canvas made" << std::endl;
 
     //Create some histograms to fill with the branch in a loop over entries (Option 1)
     TH1F *hist_Z = new TH1F("Z Invariant Mass", "Z Invariant Mass", 50, 50, 200);
-    TH1F *hist_cosTheta = new TH1F("cos theta", "cos Theta", 100, -1, 1);
+    TH1F *hist_cosTheta = new TH1F("cos Theta", "cos Theta", 100, -1, 1);
+    TH1F *hist_W = new TH1F("W Invariant Mass", "W Invariant Mass", 50, 50, 150);
     std::cout << "4) Making Histograms" << std::endl;
 
     int nEntries = tree->GetEntries();
@@ -87,27 +109,38 @@ int main() {
 	    for (int j = 0; j < nMuons; j++) {
                 for (int k = j+1; k < nMuons; k++) {
                     Muon *mu1 = (Muon*) branchMuon->At(j);
-		    Muon *mu2 = (Muon*) branchMuon->At(k);
+                    Muon *mu2 = (Muon*) branchMuon->At(k);
 		    
-		    // Opposite charges: 
-		    if (mu1->Charge * mu2->Charge >= 0) continue;
+                    // Opposite charges: 
+                    if (mu1->Charge * mu2->Charge >= 0) continue;
 		    
-		    // The two leptons that the Z boson decayed into:	    
-		    ROOT::Math::PtEtaPhiMVector v1(mu1->PT, mu1->Eta, mu1->Phi, 0.105);
-		    ROOT::Math::PtEtaPhiMVector v2(mu2->PT, mu2->Eta, mu2->Phi, 0.105);
+                    // The two leptons that the Z boson decayed into:	    
+                    ROOT::Math::PtEtaPhiMVector v1(mu1->PT, mu1->Eta, mu1->Phi, 0.105);
+                    ROOT::Math::PtEtaPhiMVector v2(mu2->PT, mu2->Eta, mu2->Phi, 0.105);
 		    
-		    auto Z = v1 + v2;
-		    hist_Z->Fill(Z.M());
-		    
-		    double cosTheta = costheta(Z, v1, v2);
-		    hist_cosTheta->Fill(cosTheta);
-		}
-	    }
-	}
+                    auto Z = v1 + v2;
+                    hist_Z->Fill(Z.M());
+
+                    // Recreating the W boson:
+                    
+                    // Get cosTheta		    
+                    double cosTheta = costheta(Z, v1, v2);
+                    hist_cosTheta->Fill(cosTheta);
+                }
+            }
+        }
+        if (branchElectron->GetEntries() > 0 && branchMissingET->GetEntries() >0) {
+	    Electron *el = (Electron*) branchElectron->At(0);
+            MissingET *missingET = (MissingET*) branchMissingET->At(0);
+        
+            double w_mass = calculateW_MT(el->Phi, el->PT, missingET->MET, missingET->Phi);
+            hist_W->Fill(w_mass);
+        }
     }
 
     // Drawing the Z mass Histogram
     hist_Z->Draw();
+    hist_Z->GetXaxis()->SetTitle("Mass (GeV)");
     //Save Histogram
     c1->SaveAs("Z_mass.pdf");
 
@@ -115,7 +148,14 @@ int main() {
     hist_cosTheta->Draw();
     c2->SaveAs("cosTheta.pdf");
 
+    c3->cd();
+    hist_W->Draw();
+    c3->SaveAs("W_mass.pdf");
     std::cout << "Histogram saved" << std::endl;
 
     return 0;
 }
+
+
+
+
