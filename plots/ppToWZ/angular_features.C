@@ -72,8 +72,13 @@ double calculateW_MT (double lepton_phi, double lepton_pt, double met, double me
 
 int main() {
 
+    /* The polarization files: 
+    long_pol_diboson.root
+    trans_pol_diboson.root
+    */
+
     //Load the file and get the tree
-    TFile *hfile = new TFile("/afs/hep.wisc.edu/home/kmartine/Event_Generation/MG5_aMC_v3_6_7/ppToWZ/Events/run_02/tag_1_delphes_events.root");
+    TFile *hfile = new TFile("long_pol_diboson.root");
     TTree *tree = (TTree*)hfile->Get("Delphes");
     std::cout << "1) File was loaded & Tree made" << std::endl;
     // tree->Print();
@@ -86,6 +91,8 @@ int main() {
     tree->SetBranchAddress("Electron", &branchElectron);
     TClonesArray *branchMissingET = 0;
     tree->SetBranchAddress("MissingET", &branchMissingET);
+    TClonesArray *branchParticle = 0;
+    tree->SetBranchAddress("Particle", &branchParticle);
 
     //Create a canvas to put plots onto
     TCanvas *c1 = new TCanvas("c1", "Canvas", 1200, 1000);
@@ -96,16 +103,43 @@ int main() {
     //Create some histograms to fill with the branch in a loop over entries (Option 1)
     TH1F *hist_Z = new TH1F("Z Invariant Mass", "Z Invariant Mass", 50, 50, 200);
     TH1F *hist_cosTheta = new TH1F("cos Theta", "cos Theta", 100, -1, 1);
-    TH1F *hist_W = new TH1F("W Invariant Mass", "W Invariant Mass", 50, 50, 150);
+    TH1F *hist_W = new TH1F("W Transverse Mass", "W Transverse Mass", 50, 50, 150);
     std::cout << "4) Making Histograms" << std::endl;
 
     int nEntries = tree->GetEntries();
     std::cout << "nEntries = " << nEntries << std::endl;
     for (int i=0; i<nEntries; i++){
         tree->GetEntry(i);
+        /////////////////////////////////
+        // GEN PARTICLE RECONSTRUCTION //
+        /////////////////////////////////
+        int nParticle = branchParticle->GetEntries(); // number of events to loop through
+
+	bool elFromW = false; // checks to make sure I use the correct electrons/muons
+	bool muFromZ = false;
+
+        for (int n = 0; n < nParticle; n++) { // Looping through each event,
+            GenParticle *p = (GenParticle*) branchParticle->At(n); // p is the particle we're using to see it's mother
+            int motherIndex = p->M1; // M1 is the mother particle as a characteristic of p
+	                             // motherIndex clarifies which particle in the event we're looking at
+            if (motherIndex < 0) continue; // if motherindex == 0, then no mother assigned so we skip
+
+            GenParticle *mother = (GenParticle*) branchParticle->At(motherIndex); // We label the mother as the particle at the motherIndex
+
+            if (abs(p->PID) == 11 && abs(mother->PID) == 24) { // knowing the particle and mother, we can check the particle ID
+                elFromW = true; // flag is true
+            }
+            if (abs(p->PID) == 13 && abs(mother->PID) == 23) {
+                muFromZ = true;
+            }
+        }
+
+        //////////////////////////////////
+        // RECO PARTICLE RECONSTRUCTION //
+        //////////////////////////////////
         int nMuons = branchMuon->GetEntries();
 
-	if (nMuons >= 2) {
+	if (muFromZ == true && nMuons >= 2) {
 	    for (int j = 0; j < nMuons; j++) {
                 for (int k = j+1; k < nMuons; k++) {
                     Muon *mu1 = (Muon*) branchMuon->At(j);
@@ -121,24 +155,35 @@ int main() {
                     auto Z = v1 + v2;
                     hist_Z->Fill(Z.M());
 
-                    // Recreating the W boson:
-                    
-                    // Get cosTheta		    
+                    /* Get cosTheta		    
                     double cosTheta = costheta(Z, v1, v2);
                     hist_cosTheta->Fill(cosTheta);
+                    */
+                    if (elFromW == true && branchElectron->GetEntries() > 0 && branchMissingET->GetEntries() >0) {
+                        // I need to check if this electron came from the W boson and not some other showering event
+                        // I should use it to see if the mother particle it came from was a W boson; maybe check with the Electron->Particle branch
+                        Electron *el = (Electron*) branchElectron->At(0);
+                        MissingET *missingET = (MissingET*) branchMissingET->At(0);
+     
+                        double w_mass = calculateW_MT(el->Phi, el->PT, missingET->MET, missingET->Phi);
+                        hist_W->Fill(w_mass);
+
+                        // I also need to create the 4-vector of the W boson
+                        ROOT::Math::PtEtaPhiMVector lep1(el->PT, el->Eta, el->Phi, 0);
+                        ROOT::Math::PtEtaPhiMVector nu2(missingET->MET, missingET->Eta, missingET->Phi, 0);
+                        auto W = lep1 + nu2;
+
+                        // Get cosTheta		    
+                        double cosTheta = costheta(W, v1, v2);
+                        hist_cosTheta->Fill(cosTheta);
+	            }
                 }
             }
-        }
-        if (branchElectron->GetEntries() > 0 && branchMissingET->GetEntries() >0) {
-	    Electron *el = (Electron*) branchElectron->At(0);
-            MissingET *missingET = (MissingET*) branchMissingET->At(0);
-        
-            double w_mass = calculateW_MT(el->Phi, el->PT, missingET->MET, missingET->Phi);
-            hist_W->Fill(w_mass);
         }
     }
 
     // Drawing the Z mass Histogram
+    c1->cd();
     hist_Z->Draw();
     hist_Z->GetXaxis()->SetTitle("Mass (GeV)");
     //Save Histogram
@@ -146,6 +191,7 @@ int main() {
 
     c2->cd();
     hist_cosTheta->Draw();
+    hist_cosTheta->SetTitle("In Diboson Frame");
     c2->SaveAs("cosTheta.pdf");
 
     c3->cd();
