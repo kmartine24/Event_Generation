@@ -78,7 +78,7 @@ int main() {
     */
 
     //Load the file and get the tree
-    TFile *hfile = new TFile("long_pol_diboson.root");
+    TFile *hfile = new TFile("trans_pol_diboson.root");
     TTree *tree = (TTree*)hfile->Get("Delphes");
     std::cout << "1) File was loaded & Tree made" << std::endl;
     // tree->Print();
@@ -115,8 +115,8 @@ int main() {
         /////////////////////////////////
         int nParticle = branchParticle->GetEntries(); // number of events to loop through
 
-	bool elFromW = false; // checks to make sure I use the correct electrons/muons
-	bool muFromZ = false;
+        bool elFromW = false; // checks to make sure I use the correct electrons/muons
+        bool muFromZ = false;
 
         for (int n = 0; n < nParticle; n++) { // Looping through each event,
             GenParticle *p = (GenParticle*) branchParticle->At(n); // p is the particle we're using to see it's mother
@@ -139,7 +139,7 @@ int main() {
         //////////////////////////////////
         int nMuons = branchMuon->GetEntries();
 
-	if (muFromZ == true && nMuons >= 2) {
+        if (muFromZ == true && nMuons >= 2) {
 	    for (int j = 0; j < nMuons; j++) {
                 for (int k = j+1; k < nMuons; k++) {
                     Muon *mu1 = (Muon*) branchMuon->At(j);
@@ -155,10 +155,6 @@ int main() {
                     auto Z = v1 + v2;
                     hist_Z->Fill(Z.M());
 
-                    /* Get cosTheta		    
-                    double cosTheta = costheta(Z, v1, v2);
-                    hist_cosTheta->Fill(cosTheta);
-                    */
                     if (elFromW == true && branchElectron->GetEntries() > 0 && branchMissingET->GetEntries() >0) {
                         // I need to check if this electron came from the W boson and not some other showering event
                         // I should use it to see if the mother particle it came from was a W boson; maybe check with the Electron->Particle branch
@@ -176,7 +172,7 @@ int main() {
                         // Get cosTheta		    
                         double cosTheta = costheta(W, v1, v2);
                         hist_cosTheta->Fill(cosTheta);
-	            }
+                    }
                 }
             }
         }
