@@ -52,11 +52,7 @@ double costheta(const ROOT::Math::PtEtaPhiMVector& w1P4_input, const ROOT::Math:
     // Based on Susmita's code, I need to include the W boson, and then boost the Z lepton to the WZ rest frame
 
     double cosTheta = ROOT::Math::VectorUtil::CosTheta(lepton1_zframe, z_dibosonFrame);
-    /* Trying the cosTheta function in ROOT
-    double cosTheta = lepton1_restcom.Vect().Dot(zP4.Vect()) /
-                      (lepton1_restcom.Vect().R() * zP4.Vect().R()); // No more .Mag(); use .R()
-    */
-    return cosTheta;  // cosTheta is calculated in the Z rest frame
+    return cosTheta;  // cosTheta is calculated in the WZ rest frame
 }
 
 double calculateW_MT (double lepton_phi, double lepton_pt, double met, double metphi) {
@@ -70,15 +66,20 @@ double calculateW_MT (double lepton_phi, double lepton_pt, double met, double me
     return W_mt;
 }
 
+bool checkMother(GenParticle * p, int motherPID, TClonesArray *branchParticle) {
+    int motherIndex = p->M1;
+    while (motherIndex > 0) {
+        GenParticle *mother = (GenParticle*) branchParticle->At(motherIndex);
+        if (abs(mother->PID) == motherPID) return true; 
+	motherIndex = mother->M1;
+    }
+    return false;
+}
+
 int main() {
 
-    /* The polarization files: 
-    long_pol_diboson.root
-    trans_pol_diboson.root
-    */
-
     //Load the file and get the tree
-    TFile *hfile = new TFile("trans_pol_diboson.root");
+    TFile *hfile = new TFile("trans_pol_diboson.root"); // Choose one: long_pol_diboson.root or trans_pol_diboson.root
     TTree *tree = (TTree*)hfile->Get("Delphes");
     std::cout << "1) File was loaded & Tree made" << std::endl;
     // tree->Print();
@@ -110,73 +111,71 @@ int main() {
     std::cout << "nEntries = " << nEntries << std::endl;
     for (int i=0; i<nEntries; i++){
         tree->GetEntry(i);
-        /////////////////////////////////
-        // GEN PARTICLE RECONSTRUCTION //
-        /////////////////////////////////
-        int nParticle = branchParticle->GetEntries(); // number of events to loop through
 
-        bool elFromW = false; // checks to make sure I use the correct electrons/muons
-        bool muFromZ = false;
-
-        for (int n = 0; n < nParticle; n++) { // Looping through each event,
-            GenParticle *p = (GenParticle*) branchParticle->At(n); // p is the particle we're using to see it's mother
-            int motherIndex = p->M1; // M1 is the mother particle as a characteristic of p
-	                             // motherIndex clarifies which particle in the event we're looking at
-            if (motherIndex < 0) continue; // if motherindex == 0, then no mother assigned so we skip
-
-            GenParticle *mother = (GenParticle*) branchParticle->At(motherIndex); // We label the mother as the particle at the motherIndex
-
-            if (abs(p->PID) == 11 && abs(mother->PID) == 24) { // knowing the particle and mother, we can check the particle ID
-                elFromW = true; // flag is true
-            }
-            if (abs(p->PID) == 13 && abs(mother->PID) == 23) {
-                muFromZ = true;
-            }
-        }
-
-        //////////////////////////////////
-        // RECO PARTICLE RECONSTRUCTION //
-        //////////////////////////////////
+        //////////////////
+        // Z boson Info //
+        //////////////////
         int nMuons = branchMuon->GetEntries();
 
-        if (muFromZ == true && nMuons >= 2) {
-	    for (int j = 0; j < nMuons; j++) {
-                for (int k = j+1; k < nMuons; k++) {
-                    Muon *mu1 = (Muon*) branchMuon->At(j);
-                    Muon *mu2 = (Muon*) branchMuon->At(k);
+	for (int j = 0; j < nMuons; j++) {
+            for (int k = j+1; k < nMuons; k++) {
+                Muon *mu1 = (Muon*) branchMuon->At(j);
+                Muon *mu2 = (Muon*) branchMuon->At(k);
 		    
-                    // Opposite charges: 
-                    if (mu1->Charge * mu2->Charge >= 0) continue;
-		    
-                    // The two leptons that the Z boson decayed into:	    
-                    ROOT::Math::PtEtaPhiMVector v1(mu1->PT, mu1->Eta, mu1->Phi, 0.105);
-                    ROOT::Math::PtEtaPhiMVector v2(mu2->PT, mu2->Eta, mu2->Phi, 0.105);
-		    
-                    auto Z = v1 + v2;
-                    hist_Z->Fill(Z.M());
+                // Opposite charges: 
+                if (mu1->Charge * mu2->Charge >= 0) continue;
+		
+                // Perform Gen level checking:
+                GenParticle *gen1 = (GenParticle*) mu1->Particle.GetObject(); // Getting the gen level info (particle) associated with mu1/mu2
+                GenParticle *gen2 = (GenParticle*) mu2->Particle.GetObject();
 
-                    if (elFromW == true && branchElectron->GetEntries() > 0 && branchMissingET->GetEntries() >0) {
-                        // I need to check if this electron came from the W boson and not some other showering event
-                        // I should use it to see if the mother particle it came from was a W boson; maybe check with the Electron->Particle branch
-                        Electron *el = (Electron*) branchElectron->At(0);
-                        MissingET *missingET = (MissingET*) branchMissingET->At(0);
+                if (!gen1 || !gen2) continue; // make sure gen1 or gen2 is not a nullptr
+
+                // Check mother info with checkMother()
+                if (!checkMother(gen1, 23, branchParticle)) continue;
+                if (!checkMother(gen2, 23, branchParticle)) continue;
+
+                // The two leptons that the Z boson decayed into:	    
+                ROOT::Math::PtEtaPhiMVector v1(mu1->PT, mu1->Eta, mu1->Phi, 0.105);
+                ROOT::Math::PtEtaPhiMVector v2(mu2->PT, mu2->Eta, mu2->Phi, 0.105);
+		    
+                auto Z = v1 + v2;
+                hist_Z->Fill(Z.M());
+
+                //////////////////
+                // W Boson Info //
+                //////////////////
+                int nElectrons = branchElectron->GetEntries();
+                for (int l = 0; l < nElectrons; l++) {
+                
+                    Electron *el = (Electron*) branchElectron->At(l);
+
+                    GenParticle *genEl = (GenParticle*) el->Particle.GetObject(); // Get gen level data associated with el
+                    if (!genEl) continue; // make sure not a nullptr
+
+                    if (!checkMother(genEl, 24, branchParticle)) continue;
+
+                    // Reconstruct the W mass:
+                    // if (branchMissingET->GetEntries() == 0) continue; // Make sure the event had a neutrino
+
+                    MissingET *missingET = (MissingET*) branchMissingET->At(0);
      
-                        double w_mass = calculateW_MT(el->Phi, el->PT, missingET->MET, missingET->Phi);
-                        hist_W->Fill(w_mass);
+                    double w_mass = calculateW_MT(el->Phi, el->PT, missingET->MET, missingET->Phi);
+                    hist_W->Fill(w_mass);
 
-                        // I also need to create the 4-vector of the W boson
-                        ROOT::Math::PtEtaPhiMVector lep1(el->PT, el->Eta, el->Phi, 0);
-                        ROOT::Math::PtEtaPhiMVector nu2(missingET->MET, missingET->Eta, missingET->Phi, 0);
-                        auto W = lep1 + nu2;
+                    // I also need to create the 4-vector of the W boson
+                    ROOT::Math::PtEtaPhiMVector lep1(el->PT, el->Eta, el->Phi, 0);
+                    ROOT::Math::PtEtaPhiMVector nu2(missingET->MET, 0.0, missingET->Phi, 0);
+                    auto W = lep1 + nu2;
 
-                        // Get cosTheta		    
-                        double cosTheta = costheta(W, v1, v2);
-                        hist_cosTheta->Fill(cosTheta);
-                    }
+                    // Get cosTheta		    
+                    double cosTheta = costheta(W, v1, v2);
+                    hist_cosTheta->Fill(cosTheta);
                 }
             }
         }
     }
+    std::cout << "5) Event Loop Done" << std::endl;
 
     // Drawing the Z mass Histogram
     c1->cd();
@@ -192,6 +191,7 @@ int main() {
 
     c3->cd();
     hist_W->Draw();
+    hist_W->GetXaxis()->SetTitle("Mass (GeV)");
     c3->SaveAs("W_mass.pdf");
     std::cout << "Histogram saved" << std::endl;
 
