@@ -38,12 +38,12 @@ double costheta(const TLorentzVector& z1P4_input, const TLorentzVector& z2P4_inp
 */
 // My cosTheta code:
 double costheta(const ROOT::Math::PtEtaPhiMVector& w1P4_input, const ROOT::Math::PtEtaPhiMVector& lepton1P4_input, const ROOT::Math::PtEtaPhiMVector& lepton2P4_input) {
-    ROOT::Math::PtEtaPhiMVector lepton1P4 = lepton1P4_input; // Lepton1
-    ROOT::Math::PtEtaPhiMVector lepton2P4 = lepton2P4_input; // Lepton2
+    ROOT::Math::PtEtaPhiMVector lepton1P4 = lepton1P4_input; // Lepton1 from Z
+    ROOT::Math::PtEtaPhiMVector lepton2P4 = lepton2P4_input; // Lepton2 from Z
 
     ROOT::Math::PtEtaPhiMVector zP4 = lepton1P4 + lepton2P4; // Z boson recreated from leptons
 
-    ROOT::Math::Boost boostToZRestFrame(-zP4.BoostToCM());
+    ROOT::Math::Boost boostToZRestFrame(-zP4.BoostToCM()); // .BoostToCM() appears to be standard practice?
     auto lepton1_zframe = boostToZRestFrame(lepton1P4);
 
     ROOT::Math::PtEtaPhiMVector wzP4 = zP4 + w1P4_input;
@@ -78,8 +78,21 @@ bool checkMother(GenParticle * p, int motherPID, TClonesArray *branchParticle) {
 
 int main() {
 
+    bool _long = true; 
+    bool _trans = false;
+    TFile *hfile = nullptr;
+    /* Files: 
+    longitudinal polarized: /afs/hep.wisc.edu/home/kmartine/Event_Generation/MG5_aMC_v3_6_7/ppToWZ_long/Events/run_01/tag_1_delphes_events.root 
+    transverse polarized: /afs/hep.wisc.edu/home/kmartine/Event_Generation/MG5_aMC_v3_6_7/ppToWZ/Events/run_02/tag_1_delphes_events.root
+    */
     //Load the file and get the tree
-    TFile *hfile = new TFile("trans_pol_diboson.root"); // Choose one: long_pol_diboson.root or trans_pol_diboson.root
+    if (_trans == true) {
+        hfile = new TFile("/afs/hep.wisc.edu/home/kmartine/Event_Generation/MG5_aMC_v3_6_7/ppToWZ/Events/run_02/tag_1_delphes_events.root");
+    }
+    else if (_long == true) {
+        hfile = new TFile("/afs/hep.wisc.edu/home/kmartine/Event_Generation/MG5_aMC_v3_6_7/ppToWZ_long/Events/run_01/tag_1_delphes_events.root"); 
+    }
+    else { std::cout << "Pick a ROOT File" << std::endl; }
     TTree *tree = (TTree*)hfile->Get("Delphes");
     std::cout << "1) File was loaded & Tree made" << std::endl;
     // tree->Print();
@@ -182,17 +195,20 @@ int main() {
     hist_Z->Draw();
     hist_Z->GetXaxis()->SetTitle("Mass (GeV)");
     //Save Histogram
-    c1->SaveAs("Z_mass.pdf");
+    if (_trans == true) c1->SaveAs("Z_mass_trans.pdf");
+    if (_long == true) c1->SaveAs("Z_mass_long.pdf");
 
     c2->cd();
     hist_cosTheta->Draw();
     hist_cosTheta->SetTitle("In Diboson Frame");
-    c2->SaveAs("cosTheta.pdf");
+    if (_trans == true) c2->SaveAs("cosTheta_trans.pdf");
+    if (_long == true) c2->SaveAs("cosTheta_long.pdf");
 
     c3->cd();
     hist_W->Draw();
     hist_W->GetXaxis()->SetTitle("Mass (GeV)");
-    c3->SaveAs("W_mass.pdf");
+    if (_trans == true) c3->SaveAs("W_mass_trans.pdf");
+    if (_long == true) c3->SaveAs("W_mass_long.pdf");
     std::cout << "Histogram saved" << std::endl;
 
     return 0;
