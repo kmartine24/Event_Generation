@@ -15,6 +15,7 @@
 #include <TCut.h>
 #include <TH2.h>
 #include <TLine.h>
+#include <TLegend.h>
 //C++ 
 #include <algorithm>
 #include <iostream>
@@ -78,14 +79,13 @@ bool checkMother(GenParticle * p, int motherPID, TClonesArray *branchParticle) {
 
 int main() {
 
-    bool _long = true; 
-    bool _trans = false;
+    bool _long = false; 
+    bool _trans = true;
     TFile *hfile = nullptr;
     /* Files: 
     longitudinal polarized: /afs/hep.wisc.edu/home/kmartine/Event_Generation/MG5_aMC_v3_6_7/ppToWZ_long/Events/run_01/tag_1_delphes_events.root 
     transverse polarized: /afs/hep.wisc.edu/home/kmartine/Event_Generation/MG5_aMC_v3_6_7/ppToWZ/Events/run_02/tag_1_delphes_events.root
     */
-    //Load the file and get the tree
     if (_trans == true) {
         hfile = new TFile("/afs/hep.wisc.edu/home/kmartine/Event_Generation/MG5_aMC_v3_6_7/ppToWZ/Events/run_02/tag_1_delphes_events.root");
     }
@@ -112,12 +112,17 @@ int main() {
     TCanvas *c1 = new TCanvas("c1", "Canvas", 1200, 1000);
     TCanvas *c2 = new TCanvas("c2", "Canvas", 1200, 1000);
     TCanvas *c3 = new TCanvas("c3", "Canvas", 1200, 1000);
+    TCanvas *c4 = new TCanvas("c4", "Canvas", 1200, 1000);
+    TCanvas *c5 = new TCanvas("c5", "Canvas", 1200, 1000);
     std::cout << "3) Canvas made" << std::endl;
 
-    //Create some histograms to fill with the branch in a loop over entries (Option 1)
+    //Create some histograms to fill with the branch in a loop over entries
     TH1F *hist_Z = new TH1F("Z Invariant Mass", "Z Invariant Mass", 50, 50, 200);
     TH1F *hist_cosTheta = new TH1F("cos Theta", "cos Theta", 100, -1, 1);
     TH1F *hist_W = new TH1F("W Transverse Mass", "W Transverse Mass", 50, 50, 150);
+    TH1F *hist_Zpt = new TH1F("Z Transverse Momentum", "Z Transverse Momentum", 50, 0, 250); 
+    TH1F *hist_Zlep1_pt = new TH1F("Muon pT", "Muon Transverse Momentum", 50, 0, 250);
+    TH1F *hist_Zlep2_pt = new TH1F("Muon pT", "Muon Transverse Momentum", 50, 0, 250);
     std::cout << "4) Making Histograms" << std::endl;
 
     int nEntries = tree->GetEntries();
@@ -148,12 +153,30 @@ int main() {
                 if (!checkMother(gen1, 23, branchParticle)) continue;
                 if (!checkMother(gen2, 23, branchParticle)) continue;
 
-                // The two leptons that the Z boson decayed into:	    
+                // The two leptons that the Z boson decayed into: v1 is the lepton, v2 is the anti-lepton
+                ROOT::Math::PtEtaPhiMVector v1(0, 0, 0, 0);
+		ROOT::Math::PtEtaPhiMVector v2(0, 0, 0, 0);
+		if (gen1->Charge < 0 && gen2->Charge > 0) {
+                    v1 = ROOT::Math::PtEtaPhiMVector(mu1->PT, mu1->Eta, mu1->Phi, 0.105); // Muon
+		    v2 = ROOT::Math::PtEtaPhiMVector(mu2->PT, mu2->Eta, mu2->Phi, 0.105); // Anti-Muon
+                } 
+		else if (gen1->Charge > 0 && gen2->Charge < 0) {
+                    v1 = ROOT::Math::PtEtaPhiMVector(mu2->PT, mu2->Eta, mu2->Phi, 0.105); // Muon
+		    v2 = ROOT::Math::PtEtaPhiMVector(mu1->PT, mu1->Eta, mu1->Phi, 0.105); // Anti-Muon
+                }
+                else {std::cout << "Something went wrong" << std::endl;}
+
+                /*
                 ROOT::Math::PtEtaPhiMVector v1(mu1->PT, mu1->Eta, mu1->Phi, 0.105);
                 ROOT::Math::PtEtaPhiMVector v2(mu2->PT, mu2->Eta, mu2->Phi, 0.105);
-		    
+                */
+
                 auto Z = v1 + v2;
                 hist_Z->Fill(Z.M());
+		hist_Zpt->Fill(Z.Pt());
+
+                hist_Zlep1_pt->Fill(v1.Pt());
+                hist_Zlep2_pt->Fill(v2.Pt());
 
                 //////////////////
                 // W Boson Info //
@@ -209,6 +232,26 @@ int main() {
     hist_W->GetXaxis()->SetTitle("Mass (GeV)");
     if (_trans == true) c3->SaveAs("W_mass_trans.pdf");
     if (_long == true) c3->SaveAs("W_mass_long.pdf");
+
+    c4->cd();
+    hist_Zpt->Draw();
+    hist_Zpt->GetXaxis()->SetTitle("pT");
+    if (_trans == true) c4->SaveAs("Z_pt_trans.pdf");
+    if (_long == true) c4->SaveAs("Z_pt_long.pdf");
+
+    c5->cd();
+    hist_Zlep2_pt->Draw();
+    hist_Zlep1_pt->Draw("SAME");
+    hist_Zlep2_pt->SetLineColor(kRed);
+    hist_Zlep1_pt->SetLineColor(kBlue);
+    TLegend *leg = new TLegend(0.5, 0.8, 0.7, 0.9);
+    leg->AddEntry(hist_Zlep1_pt, "Muon 1", "l");
+    leg->AddEntry(hist_Zlep2_pt, "Muon 2", "l");
+    leg->Draw();
+    hist_Zlep2_pt->GetXaxis()->SetTitle("p_T");
+    if (_trans == true) c5->SaveAs("Z_lep_pt_trans.pdf");
+    if (_long == true) c5->SaveAs("Z_lep_pt_long.pdf");
+
     std::cout << "Histogram saved" << std::endl;
 
     return 0;
