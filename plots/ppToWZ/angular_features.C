@@ -39,8 +39,8 @@ double costheta(const TLorentzVector& z1P4_input, const TLorentzVector& z2P4_inp
 */
 // My cosTheta code:
 double costheta(const ROOT::Math::PtEtaPhiMVector& w1P4_input, const ROOT::Math::PtEtaPhiMVector& lepton1P4_input, const ROOT::Math::PtEtaPhiMVector& lepton2P4_input) {
-    ROOT::Math::PtEtaPhiMVector lepton1P4 = lepton1P4_input; // Lepton1 from Z
-    ROOT::Math::PtEtaPhiMVector lepton2P4 = lepton2P4_input; // Lepton2 from Z
+    ROOT::Math::PtEtaPhiMVector lepton1P4 = lepton1P4_input; // Lepton1 from Z is the particle
+    ROOT::Math::PtEtaPhiMVector lepton2P4 = lepton2P4_input; // Lepton2 from Z is the anti-particle
 
     ROOT::Math::PtEtaPhiMVector zP4 = lepton1P4 + lepton2P4; // Z boson recreated from leptons
 
@@ -50,7 +50,6 @@ double costheta(const ROOT::Math::PtEtaPhiMVector& w1P4_input, const ROOT::Math:
     ROOT::Math::PtEtaPhiMVector wzP4 = zP4 + w1P4_input;
     ROOT::Math::Boost boostToWZFrame(-wzP4.BoostToCM());
     auto z_dibosonFrame = boostToWZFrame(zP4);
-    // Based on Susmita's code, I need to include the W boson, and then boost the Z lepton to the WZ rest frame
 
     double cosTheta = ROOT::Math::VectorUtil::CosTheta(lepton1_zframe, z_dibosonFrame);
     return cosTheta;  // cosTheta is calculated in the WZ rest frame
@@ -240,13 +239,13 @@ int main() {
     if (_long == true) c4->SaveAs("Z_pt_long.pdf");
 
     c5->cd();
-    hist_Zlep2_pt->Draw();
-    hist_Zlep1_pt->Draw("SAME");
-    hist_Zlep2_pt->SetLineColor(kRed);
-    hist_Zlep1_pt->SetLineColor(kBlue);
+    hist_Zlep1_pt->Draw();
+    hist_Zlep2_pt->Draw("SAME");
+    hist_Zlep1_pt->SetLineColor(kRed);
+    hist_Zlep2_pt->SetLineColor(kBlue);
     TLegend *leg = new TLegend(0.5, 0.8, 0.7, 0.9);
-    leg->AddEntry(hist_Zlep1_pt, "Muon 1", "l");
-    leg->AddEntry(hist_Zlep2_pt, "Muon 2", "l");
+    leg->AddEntry(hist_Zlep1_pt, "Muon", "l");
+    leg->AddEntry(hist_Zlep2_pt, "Anti-Muon", "l");
     leg->Draw();
     hist_Zlep2_pt->GetXaxis()->SetTitle("p_T");
     if (_trans == true) c5->SaveAs("Z_lep_pt_trans.pdf");
