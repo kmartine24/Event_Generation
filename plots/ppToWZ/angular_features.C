@@ -211,7 +211,8 @@ int main() {
 	ROOT::Math::PtEtaPhiMVector lep1(0, 0, 0, 0);
 	ROOT::Math::PtEtaPhiMVector nu2(0, 0, 0, 0);
 	ROOT::Math::PtEtaPhiMVector W(0, 0, 0, 0);
-        std::cout << "Starting Electron Loop" << std::endl;
+        double w_mass = 0.0;
+	std::cout << "Starting Electron Loop" << std::endl;
         for (int l = 0; l < nElectrons; l++) {
                 
             Electron *el = (Electron*) branchElectron->At(l);
@@ -230,6 +231,7 @@ int main() {
             hist_W->Fill(w_mass);
             */
 
+            w_mass = calculateW_MT(el->Phi, el->PT, missingET->MET, missingET->Phi);
             // I also need to create the 4-vector of the W boson
             lep1 = ROOT::Math::PtEtaPhiMVector(el->PT, el->Eta, el->Phi, 0);
             nu2 = ROOT::Math::PtEtaPhiMVector(missingET->MET, 0.0, missingET->Phi, 0);
@@ -241,16 +243,19 @@ int main() {
         // Continue if W and Z were produced //
         ///////////////////////////////////////
 	if (!foundZ || !foundW) continue; 
+        std::cout << "Outside Electron Loop" << std::endl;
 
         /////////////////////
         // Fill Histograms //
         /////////////////////
+        // (A) W Boson
+	hist_W->Fill(w_mass);
+	// (B) Z Boson
 	hist_Z->Fill(Z.M());
 	hist_Zpt->Fill(Z.Pt());
 	hist_Zlep1_pt->Fill(v1.Pt());
 	hist_Zlep2_pt->Fill(v2.Pt());
-        std::cout << "Outside Electron Loop" << std::endl;
-        // Get cosTheta
+        // (C) cosTheta
 	std::cout << "Starting cosTheta calculation" << std::endl;
 	std::cout << "W = " << W << ", v1 = " << v1 << ", v2 = " << v2 << ", lep1 = " << lep1 << std::endl;
         double cosThetaW = costheta(W, v1, v2, lep1, true, false);
