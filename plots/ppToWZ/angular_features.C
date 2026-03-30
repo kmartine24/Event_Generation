@@ -57,14 +57,14 @@ double costheta(const ROOT::Math::PtEtaPhiMVector& w1P4_input, const ROOT::Math:
         lepton_BosonFrame = boostToZRestFrame(lepton1P4);
         auto z_dibosonFrame = boostToWZFrame(zP4);
 	ROOT::Math::DisplacementVector3D z_dir = z_dibosonFrame.Vect().Unit();
-	auto z_dir_Zframe = boostToZRestFrame(ROOT::Math::XYZTVector(z_dir.X(), z_dir.Y(), z_dir.Z(), 0.0));
+	auto z_dir_Zframe = boostToZRestFrame(ROOT::Math::PxPyPzMVector(z_dir.X(), z_dir.Y(), z_dir.Z(), 0.0));
 	cosTheta = ROOT::Math::VectorUtil::CosTheta(lepton_BosonFrame.Vect(), z_dir_Zframe.Vect());
     }
     else if (fromW == true && fromZ == false) { // in the W boson frame:
         lepton_BosonFrame = boostToWRestFrame(lepton3P4);
         auto w_dibosonFrame = boostToWZFrame(w1P4_input);
 	ROOT::Math::DisplacementVector3D w_dir = w_dibosonFrame.Vect().Unit();
-	auto w_dir_Wframe = boostToWRestFrame(ROOT::Math::XYZTVector(w_dir.X(), w_dir.Y(), w_dir.Z(), 0.0));
+	auto w_dir_Wframe = boostToWRestFrame(ROOT::Math::PxPyPzMVector(w_dir.X(), w_dir.Y(), w_dir.Z(), 0.0));
 	cosTheta = ROOT::Math::VectorUtil::CosTheta(lepton_BosonFrame.Vect(), w_dir_Wframe.Vect());
     }
     else {std::cout << "Something went wrong" << std::endl;}
@@ -150,7 +150,10 @@ int main() {
     std::cout << "nEntries = " << nEntries << std::endl;
     for (int i=0; i<nEntries; i++){
         tree->GetEntry(i);
-
+        std::cout << std::endl;
+	std::cout << "nEntry = " << i << std::endl;
+	bool foundZ = false; 
+	bool foundW = false; 
         //////////////////
         // Z boson Info //
         //////////////////
@@ -159,6 +162,7 @@ int main() {
         ROOT::Math::PtEtaPhiMVector v1(0, 0, 0, 0);
         ROOT::Math::PtEtaPhiMVector v2(0, 0, 0, 0);
         ROOT::Math::PtEtaPhiMVector Z(0, 0, 0, 0);
+        std::cout << "Inside Muon loop: " << std::endl;
 	for (int j = 0; j < nMuons; j++) {
             for (int k = j+1; k < nMuons; k++) {
                 Muon *mu1 = (Muon*) branchMuon->At(j);
@@ -194,22 +198,23 @@ int main() {
                 */
 
                 Z = v1 + v2;
-                hist_Z->Fill(Z.M());
-		hist_Zpt->Fill(Z.Pt());
-
-                hist_Zlep1_pt->Fill(v1.Pt());
-                hist_Zlep2_pt->Fill(v2.Pt());
+                foundZ = true;
             }
+            if (foundZ) break;
         }
 
-            //////////////////
-            // W Boson Info //
-            //////////////////
+        std::cout << "Outside Muon Loop" << std::endl;
+        //////////////////
+        // W Boson Info //
+        //////////////////
         int nElectrons = branchElectron->GetEntries();
+	ROOT::Math::PtEtaPhiMVector lep1(0, 0, 0, 0);
+	ROOT::Math::PtEtaPhiMVector nu2(0, 0, 0, 0);
+	ROOT::Math::PtEtaPhiMVector W(0, 0, 0, 0);
+        std::cout << "Starting Electron Loop" << std::endl;
         for (int l = 0; l < nElectrons; l++) {
                 
             Electron *el = (Electron*) branchElectron->At(l);
-
             GenParticle *genEl = (GenParticle*) el->Particle.GetObject(); // Get gen level data associated with el
             if (!genEl) continue; // make sure not a nullptr
 
@@ -220,20 +225,41 @@ int main() {
 
             MissingET *missingET = (MissingET*) branchMissingET->At(0);
      
+            /*
             double w_mass = calculateW_MT(el->Phi, el->PT, missingET->MET, missingET->Phi);
             hist_W->Fill(w_mass);
+            */
 
             // I also need to create the 4-vector of the W boson
-            ROOT::Math::PtEtaPhiMVector lep1(el->PT, el->Eta, el->Phi, 0);
-            ROOT::Math::PtEtaPhiMVector nu2(missingET->MET, 0.0, missingET->Phi, 0);
-            auto W = lep1 + nu2;
+            lep1 = ROOT::Math::PtEtaPhiMVector(el->PT, el->Eta, el->Phi, 0);
+            nu2 = ROOT::Math::PtEtaPhiMVector(missingET->MET, 0.0, missingET->Phi, 0);
+            W = lep1 + nu2;
+	    foundW = true;
+            break;
+	}
+        ///////////////////////////////////////
+        // Continue if W and Z were produced //
+        ///////////////////////////////////////
+	if (!foundZ || !foundW) continue; 
 
-            // Get cosTheta		    
-            double cosTheta = costheta(W, v1, v2, lep1, true, false);
-            hist_cosThetaW->Fill(cosTheta);
-	    cosTheta = costheta(Z, v1, v2, lep1, false, true);
-            hist_cosThetaZ->Fill(cosTheta);
-        }
+        /////////////////////
+        // Fill Histograms //
+        /////////////////////
+	hist_Z->Fill(Z.M());
+	hist_Zpt->Fill(Z.Pt());
+	hist_Zlep1_pt->Fill(v1.Pt());
+	hist_Zlep2_pt->Fill(v2.Pt());
+        std::cout << "Outside Electron Loop" << std::endl;
+        // Get cosTheta
+	std::cout << "Starting cosTheta calculation" << std::endl;
+	std::cout << "W = " << W << ", v1 = " << v1 << ", v2 = " << v2 << ", lep1 = " << lep1 << std::endl;
+        double cosThetaW = costheta(W, v1, v2, lep1, true, false);
+	std::cout << "cosTheta = " << cosThetaW << std::endl;
+        hist_cosThetaW->Fill(cosThetaW);
+	std::cout << "Z = " << Z << ", v1 = " << v1 << ", v2 = " << v2 << ", lep1 = " << lep1 << std::endl;
+	double cosThetaZ = costheta(Z, v1, v2, lep1, false, true);
+	std::cout << "cosTheta = " << cosThetaZ << std::endl;
+        hist_cosThetaZ->Fill(cosThetaZ);
     }
     std::cout << "5) Event Loop Done" << std::endl;
 
