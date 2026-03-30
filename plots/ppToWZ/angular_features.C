@@ -39,27 +39,40 @@ double costheta(const TLorentzVector& z1P4_input, const TLorentzVector& z2P4_inp
 }
 */
 // My cosTheta code:
-double costheta(const ROOT::Math::PtEtaPhiMVector& w1P4_input, const ROOT::Math::PtEtaPhiMVector& lepton1P4_input, const ROOT::Math::PtEtaPhiMVector& lepton2P4_input, ROOT::Math::PtEtaPhiMVector& lepton3P4_input) {
+double costheta(const ROOT::Math::PtEtaPhiMVector& w1P4_input, const ROOT::Math::PtEtaPhiMVector& lepton1P4_input, const ROOT::Math::PtEtaPhiMVector& lepton2P4_input, const ROOT::Math::PtEtaPhiMVector& lepton3P4_input, bool fromW, bool fromZ) {
     ROOT::Math::PtEtaPhiMVector lepton1P4 = lepton1P4_input; // Lepton1 from Z is the particle
     ROOT::Math::PtEtaPhiMVector lepton2P4 = lepton2P4_input; // Lepton2 from Z is the anti-particle
     ROOT::Math::PtEtaPhiMVector lepton3P4 = lepton3P4_input; // Lepton from W boson
 
     ROOT::Math::PtEtaPhiMVector zP4 = lepton1P4 + lepton2P4; // Z boson recreated from leptons
-    ROOT::Math::PtEtaPhiMVector wzP4 = zP4 + w1P4_input;
+    ROOT::Math::PtEtaPhiMVector wzP4 = zP4 + w1P4_input; // Diboson from W and Z bosons
 
-    /* Boost to Z CoM
-    ROOT::Math::Boost boostToZRestFrame(-zP4.BoostToCM()); // .BoostToCM() appears to be standard practice?
-    auto lepton1_zframe = boostToZRestFrame(lepton1P4);
-    */
+    // Boost to W or Z Frame
+    ROOT::Math::Boost boostToZRestFrame(-zP4.BoostToCM()); // Boost to Z restframe
+    ROOT::Math::Boost boostToWRestFrame(-w1P4_input.BoostToCM()); // Boost to W restframe 
+    ROOT::Math::Boost boostToWZFrame(-wzP4.BoostToCM()); // Boost to diboson rest frame
+    ROOT::Math::PtEtaPhiMVector lepton_BosonFrame(0,0,0,0); // make variable for lepton in boson frame 
+    double cosTheta = 0;
+    if (fromW == false && fromZ == true) { // in the Z boson frame:
+        lepton_BosonFrame = boostToZRestFrame(lepton1P4);
+        auto z_dibosonFrame = boostToWZFrame(zP4);
+	ROOT::Math::DisplacementVector3D z_dir = z_dibosonFrame.Vect().Unit();
+	auto z_dir_Zframe = boostToZRestFrame(ROOT::Math::XYZTVector(z_dir.X(), z_dir.Y(), z_dir.Z(), 0.0));
+	cosTheta = ROOT::Math::VectorUtil::CosTheta(lepton_BosonFrame.Vect(), z_dir_Zframe.Vect());
+    }
+    else if (fromW == true && fromZ == false) { // in the W boson frame:
+        lepton_BosonFrame = boostToWRestFrame(lepton3P4);
+        auto w_dibosonFrame = boostToWZFrame(w1P4_input);
+	ROOT::Math::DisplacementVector3D w_dir = w_dibosonFrame.Vect().Unit();
+	auto w_dir_Wframe = boostToWRestFrame(ROOT::Math::XYZTVector(w_dir.X(), w_dir.Y(), w_dir.Z(), 0.0));
+	cosTheta = ROOT::Math::VectorUtil::CosTheta(lepton_BosonFrame.Vect(), w_dir_Wframe.Vect());
+    }
+    else {std::cout << "Something went wrong" << std::endl;}
 
-    ROOT::Math::Boost boostToWRestFrame(-w1P4_input.BoostToCM());
-    auto lepton3_wframe = boostToWRestFrame(lepton3P4);
-
-    ROOT::Math::Boost boostToWZFrame(-wzP4.BoostToCM());
     // auto z_dibosonFrame = boostToWZFrame(zP4);
-    auto w_dibosonFrame = boostToWZFrame(w1P4_input);
+    // auto w_dibosonFrame = boostToWZFrame(w1P4_input);
 
-    double cosTheta = ROOT::Math::VectorUtil::CosTheta(lepton3_wframe, w_dibosonFrame);
+    // double cosTheta = ROOT::Math::VectorUtil::CosTheta(lepton3_wframe, w_dibosonFrame);
     return cosTheta;  // cosTheta is calculated in the WZ rest frame
 }
 
@@ -125,7 +138,8 @@ int main() {
 
     //Create some histograms to fill with the branch in a loop over entries
     TH1F *hist_Z = new TH1F("Z Invariant Mass", "Z Invariant Mass", 50, 50, 200);
-    TH1F *hist_cosTheta = new TH1F("cos Theta", "cos Theta", 100, -1, 1);
+    TH1F *hist_cosThetaW = new TH1F("cos ThetaW", "cos ThetaW", 100, -1, 1);
+    TH1F *hist_cosThetaZ = new TH1F("cos ThetaZ", "cos ThetaZ", 100, -1, 1);
     TH1F *hist_W = new TH1F("W Transverse Mass", "W Transverse Mass", 50, 50, 150);
     TH1F *hist_Zpt = new TH1F("Z Transverse Momentum", "Z Transverse Momentum", 50, 0, 250); 
     TH1F *hist_Zlep1_pt = new TH1F("Muon pT", "Muon Transverse Momentum", 50, 0, 250);
@@ -212,8 +226,10 @@ int main() {
                     auto W = lep1 + nu2;
 
                     // Get cosTheta		    
-                    double cosTheta = costheta(W, v1, v2, lep1);
-                    hist_cosTheta->Fill(cosTheta);
+                    double cosTheta = costheta(W, v1, v2, lep1, true, false);
+                    hist_cosThetaW->Fill(cosTheta);
+		    cosTheta = costheta(Z, v1, v2, lep1, false, true);
+		    hist_cosThetaZ->Fill(cosTheta);
                 }
             }
         }
@@ -229,9 +245,16 @@ int main() {
     if (_long == true) c1->SaveAs("Z_mass_long.pdf");
 
     c2->cd();
-    hist_cosTheta->Draw();
-    hist_cosTheta->SetTitle("In Diboson Frame");
-    hist_cosTheta->GetXaxis()->SetTitle("cos #theta (l,W)");
+    hist_cosThetaW->Draw();
+    hist_cosThetaW->SetLineColor(kRed);
+    hist_cosThetaW->SetTitle("In Diboson Frame");
+    hist_cosThetaW->GetXaxis()->SetTitle("cos #theta (l,W)");
+    hist_cosThetaZ->Draw("SAME");
+    hist_cosThetaZ->SetLineColor(kBlue);
+    TLegend *leg1 = new TLegend(0.5, 0.8, 0.7, 0.9);
+    leg1->AddEntry(hist_cosThetaW, "W Boson", "l");
+    leg1->AddEntry(hist_cosThetaZ, "Z Boson", "l");
+    leg1->Draw();
     if (_trans == true) c2->SaveAs("cosTheta_trans.pdf");
     if (_long == true) c2->SaveAs("cosTheta_long.pdf");
 
@@ -252,10 +275,10 @@ int main() {
     hist_Zlep2_pt->Draw("SAME");
     hist_Zlep1_pt->SetLineColor(kRed);
     hist_Zlep2_pt->SetLineColor(kBlue);
-    TLegend *leg = new TLegend(0.5, 0.8, 0.7, 0.9);
-    leg->AddEntry(hist_Zlep1_pt, "Muon", "l");
-    leg->AddEntry(hist_Zlep2_pt, "Anti-Muon", "l");
-    leg->Draw();
+    TLegend *leg2 = new TLegend(0.5, 0.8, 0.7, 0.9);
+    leg2->AddEntry(hist_Zlep1_pt, "Muon", "l");
+    leg2->AddEntry(hist_Zlep2_pt, "Anti-Muon", "l");
+    leg2->Draw();
     hist_Zlep2_pt->GetXaxis()->SetTitle("p_T");
     if (_trans == true) c5->SaveAs("Z_lep_pt_trans.pdf");
     if (_long == true) c5->SaveAs("Z_lep_pt_long.pdf");
