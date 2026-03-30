@@ -86,8 +86,8 @@ bool checkMother(GenParticle * p, int motherPID, TClonesArray *branchParticle) {
 
 int main() {
 
-    bool _long = true; 
-    bool _trans = false;
+    bool _long = false; 
+    bool _trans = true;
     TFile *hfile = nullptr;
     /* Files: 
     longitudinal polarized: /afs/hep.wisc.edu/home/kmartine/Event_Generation/MG5_aMC_v3_6_7/ppToWZ_long/Events/run_01/tag_1_delphes_events.root 
