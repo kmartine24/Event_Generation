@@ -156,6 +156,9 @@ int main() {
         //////////////////
         int nMuons = branchMuon->GetEntries();
 
+        ROOT::Math::PtEtaPhiMVector v1(0, 0, 0, 0);
+        ROOT::Math::PtEtaPhiMVector v2(0, 0, 0, 0);
+        ROOT::Math::PtEtaPhiMVector Z(0, 0, 0, 0);
 	for (int j = 0; j < nMuons; j++) {
             for (int k = j+1; k < nMuons; k++) {
                 Muon *mu1 = (Muon*) branchMuon->At(j);
@@ -175,8 +178,6 @@ int main() {
                 if (!checkMother(gen2, 23, branchParticle)) continue;
 
                 // The two leptons that the Z boson decayed into: v1 is the lepton, v2 is the anti-lepton
-                ROOT::Math::PtEtaPhiMVector v1(0, 0, 0, 0);
-		ROOT::Math::PtEtaPhiMVector v2(0, 0, 0, 0);
 		if (gen1->Charge < 0 && gen2->Charge > 0) {
                     v1 = ROOT::Math::PtEtaPhiMVector(mu1->PT, mu1->Eta, mu1->Phi, 0.105); // Muon
 		    v2 = ROOT::Math::PtEtaPhiMVector(mu2->PT, mu2->Eta, mu2->Phi, 0.105); // Anti-Muon
@@ -192,46 +193,46 @@ int main() {
                 ROOT::Math::PtEtaPhiMVector v2(mu2->PT, mu2->Eta, mu2->Phi, 0.105);
                 */
 
-                auto Z = v1 + v2;
+                Z = v1 + v2;
                 hist_Z->Fill(Z.M());
 		hist_Zpt->Fill(Z.Pt());
 
                 hist_Zlep1_pt->Fill(v1.Pt());
                 hist_Zlep2_pt->Fill(v2.Pt());
-
-                //////////////////
-                // W Boson Info //
-                //////////////////
-                int nElectrons = branchElectron->GetEntries();
-                for (int l = 0; l < nElectrons; l++) {
-                
-                    Electron *el = (Electron*) branchElectron->At(l);
-
-                    GenParticle *genEl = (GenParticle*) el->Particle.GetObject(); // Get gen level data associated with el
-                    if (!genEl) continue; // make sure not a nullptr
-
-                    if (!checkMother(genEl, 24, branchParticle)) continue;
-
-                    // Reconstruct the W mass:
-                    // if (branchMissingET->GetEntries() == 0) continue; // Make sure the event had a neutrino
-
-                    MissingET *missingET = (MissingET*) branchMissingET->At(0);
-     
-                    double w_mass = calculateW_MT(el->Phi, el->PT, missingET->MET, missingET->Phi);
-                    hist_W->Fill(w_mass);
-
-                    // I also need to create the 4-vector of the W boson
-                    ROOT::Math::PtEtaPhiMVector lep1(el->PT, el->Eta, el->Phi, 0);
-                    ROOT::Math::PtEtaPhiMVector nu2(missingET->MET, 0.0, missingET->Phi, 0);
-                    auto W = lep1 + nu2;
-
-                    // Get cosTheta		    
-                    double cosTheta = costheta(W, v1, v2, lep1, true, false);
-                    hist_cosThetaW->Fill(cosTheta);
-		    cosTheta = costheta(Z, v1, v2, lep1, false, true);
-		    hist_cosThetaZ->Fill(cosTheta);
-                }
             }
+        }
+
+            //////////////////
+            // W Boson Info //
+            //////////////////
+        int nElectrons = branchElectron->GetEntries();
+        for (int l = 0; l < nElectrons; l++) {
+                
+            Electron *el = (Electron*) branchElectron->At(l);
+
+            GenParticle *genEl = (GenParticle*) el->Particle.GetObject(); // Get gen level data associated with el
+            if (!genEl) continue; // make sure not a nullptr
+
+            if (!checkMother(genEl, 24, branchParticle)) continue;
+
+            // Reconstruct the W mass:
+            // if (branchMissingET->GetEntries() == 0) continue; // Make sure the event had a neutrino
+
+            MissingET *missingET = (MissingET*) branchMissingET->At(0);
+     
+            double w_mass = calculateW_MT(el->Phi, el->PT, missingET->MET, missingET->Phi);
+            hist_W->Fill(w_mass);
+
+            // I also need to create the 4-vector of the W boson
+            ROOT::Math::PtEtaPhiMVector lep1(el->PT, el->Eta, el->Phi, 0);
+            ROOT::Math::PtEtaPhiMVector nu2(missingET->MET, 0.0, missingET->Phi, 0);
+            auto W = lep1 + nu2;
+
+            // Get cosTheta		    
+            double cosTheta = costheta(W, v1, v2, lep1, true, false);
+            hist_cosThetaW->Fill(cosTheta);
+	    cosTheta = costheta(Z, v1, v2, lep1, false, true);
+            hist_cosThetaZ->Fill(cosTheta);
         }
     }
     std::cout << "5) Event Loop Done" << std::endl;
@@ -246,10 +247,10 @@ int main() {
 
     c2->cd();
     hist_cosThetaW->Draw();
+    hist_cosThetaZ->Draw("SAME");
     hist_cosThetaW->SetLineColor(kRed);
     hist_cosThetaW->SetTitle("In Diboson Frame");
     hist_cosThetaW->GetXaxis()->SetTitle("cos #theta (l,W)");
-    hist_cosThetaZ->Draw("SAME");
     hist_cosThetaZ->SetLineColor(kBlue);
     TLegend *leg1 = new TLegend(0.5, 0.8, 0.7, 0.9);
     leg1->AddEntry(hist_cosThetaW, "W Boson", "l");
