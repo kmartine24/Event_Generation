@@ -1,5 +1,6 @@
 #include <TClonesArray.h>
 #include "classes/DelphesClasses.h"
+#include "ExRootAnalysis/ExRootTreeReader.h"
 // Mass Reconstruction Header Files
 #include <Math/VectorUtil.h>
 #include <Math/Vector4D.h>
@@ -28,9 +29,9 @@ double costheta(const TLorentzVector& z1P4_input, const TLorentzVector& z2P4_inp
     TLorentzVector leptonP4 = leptonP4_input; // Lepton from Z1
     
     TLorentzVector zzP4 = z1P4 + z2P4; // ZZ diboson pair
+
     leptonP4.Boost(-z1P4.BoostVector());  // Boost lepton to Z1 rest frame
     z1P4.Boost(-zzP4.BoostVector());      // Boost Z1 to ZZ rest frame
-    
     double cosTheta = leptonP4.Vect().Dot(z1P4.Vect()) /
                       (leptonP4.Vect().Mag() * z1P4.Vect().Mag());
 
@@ -38,20 +39,27 @@ double costheta(const TLorentzVector& z1P4_input, const TLorentzVector& z2P4_inp
 }
 */
 // My cosTheta code:
-double costheta(const ROOT::Math::PtEtaPhiMVector& w1P4_input, const ROOT::Math::PtEtaPhiMVector& lepton1P4_input, const ROOT::Math::PtEtaPhiMVector& lepton2P4_input) {
+double costheta(const ROOT::Math::PtEtaPhiMVector& w1P4_input, const ROOT::Math::PtEtaPhiMVector& lepton1P4_input, const ROOT::Math::PtEtaPhiMVector& lepton2P4_input, ROOT::Math::PtEtaPhiMVector& lepton3P4_input) {
     ROOT::Math::PtEtaPhiMVector lepton1P4 = lepton1P4_input; // Lepton1 from Z is the particle
     ROOT::Math::PtEtaPhiMVector lepton2P4 = lepton2P4_input; // Lepton2 from Z is the anti-particle
+    ROOT::Math::PtEtaPhiMVector lepton3P4 = lepton3P4_input; // Lepton from W boson
 
     ROOT::Math::PtEtaPhiMVector zP4 = lepton1P4 + lepton2P4; // Z boson recreated from leptons
+    ROOT::Math::PtEtaPhiMVector wzP4 = zP4 + w1P4_input;
 
+    /* Boost to Z CoM
     ROOT::Math::Boost boostToZRestFrame(-zP4.BoostToCM()); // .BoostToCM() appears to be standard practice?
     auto lepton1_zframe = boostToZRestFrame(lepton1P4);
+    */
 
-    ROOT::Math::PtEtaPhiMVector wzP4 = zP4 + w1P4_input;
+    ROOT::Math::Boost boostToWRestFrame(-w1P4_input.BoostToCM());
+    auto lepton3_wframe = boostToWRestFrame(lepton3P4);
+
     ROOT::Math::Boost boostToWZFrame(-wzP4.BoostToCM());
-    auto z_dibosonFrame = boostToWZFrame(zP4);
+    // auto z_dibosonFrame = boostToWZFrame(zP4);
+    auto w_dibosonFrame = boostToWZFrame(w1P4_input);
 
-    double cosTheta = ROOT::Math::VectorUtil::CosTheta(lepton1_zframe, z_dibosonFrame);
+    double cosTheta = ROOT::Math::VectorUtil::CosTheta(lepton3_wframe, w_dibosonFrame);
     return cosTheta;  // cosTheta is calculated in the WZ rest frame
 }
 
@@ -78,8 +86,8 @@ bool checkMother(GenParticle * p, int motherPID, TClonesArray *branchParticle) {
 
 int main() {
 
-    bool _long = false; 
-    bool _trans = true;
+    bool _long = true; 
+    bool _trans = false;
     TFile *hfile = nullptr;
     /* Files: 
     longitudinal polarized: /afs/hep.wisc.edu/home/kmartine/Event_Generation/MG5_aMC_v3_6_7/ppToWZ_long/Events/run_01/tag_1_delphes_events.root 
@@ -204,7 +212,7 @@ int main() {
                     auto W = lep1 + nu2;
 
                     // Get cosTheta		    
-                    double cosTheta = costheta(W, v1, v2);
+                    double cosTheta = costheta(W, v1, v2, lep1);
                     hist_cosTheta->Fill(cosTheta);
                 }
             }
@@ -223,6 +231,7 @@ int main() {
     c2->cd();
     hist_cosTheta->Draw();
     hist_cosTheta->SetTitle("In Diboson Frame");
+    hist_cosTheta->GetXaxis()->SetTitle("cos #theta (l,W)");
     if (_trans == true) c2->SaveAs("cosTheta_trans.pdf");
     if (_long == true) c2->SaveAs("cosTheta_long.pdf");
 
