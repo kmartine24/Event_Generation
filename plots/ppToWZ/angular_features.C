@@ -104,23 +104,21 @@ double costheta(const ROOT::Math::PtEtaPhiMVector& w1P4_input, const ROOT::Math:
     ROOT::Math::XYZVector z1_dir = z1_WZframe.Vect().Unit();
     ROOT::Math::XYZVector w1_dir = w1_WZframe.Vect().Unit();
 
-    auto z1_dir_Zframe = boostToZRest(
-        ROOT::Math::PxPyPzMVector(z1_dir.X(), z1_dir.Y(), z1_dir.Z(), 0.0)
-    );
+    auto z1_dir_Zframe = boostToZRest(ROOT::Math::PxPyPzMVector(z1_dir.X(), z1_dir.Y(), z1_dir.Z(), 0.0));
     auto w1_dir_Wframe = boostToWRest(ROOT::Math::PxPyPzMVector(w1_dir.X(), w1_dir.Y(), w1_dir.Z(), 0.0));
 
     // Compute cos(theta)
     double cosTheta = 0;
     if (fromZ == true) {
-        cosTheta = ROOT::Math::VectorUtil::CosTheta(lepton_Zframe.Vect(), z1_dir_Zframe.Vect());
+        // cosTheta = ROOT::Math::VectorUtil::CosTheta(lepton_Zframe.Vect(), z1_dir_Zframe.Vect());
+        cosTheta = lepton_Zframe.Vect().Unit().Dot(z1_WZframe.Vect().Unit());
     }
     if (fromW == true) {
-        cosTheta = ROOT::Math::VectorUtil::CosTheta(lepton_Wframe.Vect(), w1_dir_Wframe.Vect());
+        // cosTheta = ROOT::Math::VectorUtil::CosTheta(lepton_Wframe.Vect(), w1_dir_Wframe.Vect());
+        cosTheta = lepton_Wframe.Vect().Unit().Dot(w1_WZframe.Vect().Unit());
     }
     return cosTheta;
 }
-
-
 
 double calculateW_MT (double lepton_phi, double lepton_pt, double met, double metphi) {
     double dphi = std::abs(lepton_phi - metphi);
@@ -145,18 +143,18 @@ bool checkMother(GenParticle * p, int motherPID, TClonesArray *branchParticle) {
 
 int main() {
 
-    bool _long = false; 
-    bool _trans = true;
+    bool _long = true; 
+    bool _trans = false;
     TFile *hfile = nullptr;
     /* Files: 
     longitudinal polarized: /afs/hep.wisc.edu/home/kmartine/Event_Generation/MG5_aMC_v3_6_7/ppToWZ_long/Events/run_01/tag_1_delphes_events.root 
     transverse polarized: /afs/hep.wisc.edu/home/kmartine/Event_Generation/MG5_aMC_v3_6_7/ppToWZ/Events/run_02/tag_1_delphes_events.root
     */
     if (_trans == true) {
-        hfile = new TFile("/afs/hep.wisc.edu/home/kmartine/Event_Generation/MG5_aMC_v3_6_7/ppToWZ/Events/run_02/tag_1_delphes_events.root");
+        hfile = new TFile("/afs/hep.wisc.edu/home/kmartine/Event_Generation/MG5_aMC_v3_6_7/ppToWZ/Events/run_03/tag_1_delphes_events.root");
     }
     else if (_long == true) {
-        hfile = new TFile("/afs/hep.wisc.edu/home/kmartine/Event_Generation/MG5_aMC_v3_6_7/ppToWZ_long/Events/run_01/tag_1_delphes_events.root"); 
+        hfile = new TFile("/afs/hep.wisc.edu/home/kmartine/Event_Generation/MG5_aMC_v3_6_7/ppToWZ_long/Events/run_03/tag_1_delphes_events.root"); 
     }
     else { std::cout << "Pick a ROOT File" << std::endl; }
     TTree *tree = (TTree*)hfile->Get("Delphes");
@@ -180,6 +178,7 @@ int main() {
     TCanvas *c3 = new TCanvas("c3", "Canvas", 1200, 1000);
     TCanvas *c4 = new TCanvas("c4", "Canvas", 1200, 1000);
     TCanvas *c5 = new TCanvas("c5", "Canvas", 1200, 1000);
+    TCanvas *c6 = new TCanvas("c6", "Canvas", 1200, 1000);
     std::cout << "3) Canvas made" << std::endl;
 
     //Create some histograms to fill with the branch in a loop over entries
@@ -190,6 +189,7 @@ int main() {
     TH1F *hist_Zpt = new TH1F("Z Transverse Momentum", "Z Transverse Momentum", 50, 0, 250); 
     TH1F *hist_Zlep1_pt = new TH1F("Muon pT", "Muon Transverse Momentum", 50, 0, 250);
     TH1F *hist_Zlep2_pt = new TH1F("Muon pT", "Muon Transverse Momentum", 50, 0, 250);
+    TH1F *hist_Wlep1_pt = new TH1F("Electron pT", "Electron Transverse Momentum", 50, 0, 250);
     std::cout << "4) Making Histograms" << std::endl;
 
     int nEntries = tree->GetEntries();
@@ -296,6 +296,7 @@ int main() {
         /////////////////////
         // (A) W Boson
         hist_W->Fill(w_mass);
+        hist_Wlep1_pt->Fill(lep1.Pt());
         // (B) Z Boson
         hist_Z->Fill(Z.M());
         hist_Zpt->Fill(Z.Pt());
@@ -361,6 +362,11 @@ int main() {
     if (_trans == true) c5->SaveAs("Z_lep_pt_trans.pdf");
     if (_long == true) c5->SaveAs("Z_lep_pt_long.pdf");
 
+    c6->cd();
+    hist_Wlep1_pt->Draw();
+    hist_Wlep1_pt->GetXaxis()->SetTitle("p_T");
+    if (_trans == true) c6->SaveAs("W_lep_pt_trans.pdf");
+    if (_long == true) c6->SaveAs("W_lep_pt_long.pdf");
     std::cout << "Histogram saved" << std::endl;
 
     return 0;
