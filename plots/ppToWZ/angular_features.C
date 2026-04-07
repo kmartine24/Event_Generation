@@ -80,14 +80,14 @@ double costheta(const ROOT::Math::PtEtaPhiMVector& w1P4_input, const ROOT::Math:
 
 double costheta(const ROOT::Math::PtEtaPhiMVector& w1P4_input, const ROOT::Math::PtEtaPhiMVector& lepton1P4_input, const ROOT::Math::PtEtaPhiMVector& lepton2P4_input, ROOT::Math::PtEtaPhiMVector& lepton3P4_input, bool fromZ, bool fromW) {
     // Copy inputs
-    ROOT::Math::PtEtaPhiMVector w1P4 = w1P4_input;  // W boson
     ROOT::Math::PtEtaPhiMVector lepton1P4 = lepton1P4_input;  // lepton1 from Z boson is a particle
-    ROOT::Math::PtEtaPhiMVector lepton2P4 = lepton2P4_input; // Lepton 2 from Z boson is an anti-particle
-    ROOT::Math::PtEtaPhiMVector lepton3P4 = lepton3P4_input; // Lepton 1 from W boson
+    ROOT::Math::PtEtaPhiMVector lepton2P4 = lepton2P4_input; // Lepton2 from Z boson is an anti-particle
+    ROOT::Math::PtEtaPhiMVector lepton3P4 = lepton3P4_input; // Lepton1 from W boson
 
     // Diboson system
     ROOT::Math::PtEtaPhiMVector z1P4 = lepton1P4 + lepton2P4; // Z boson
-    ROOT::Math::PtEtaPhiMVector wzP4 = z1P4 + w1P4;
+    ROOT::Math::PtEtaPhiMVector w1P4 = w1P4_input; // W boson
+    ROOT::Math::PtEtaPhiMVector wzP4 = z1P4 + w1P4; // Diboson system
 
     // Boost objects
     ROOT::Math::Boost boostToZRest(-z1P4.BoostToCM());  // to Z rest frame
@@ -104,18 +104,16 @@ double costheta(const ROOT::Math::PtEtaPhiMVector& w1P4_input, const ROOT::Math:
     ROOT::Math::XYZVector z1_dir = z1_WZframe.Vect().Unit();
     ROOT::Math::XYZVector w1_dir = w1_WZframe.Vect().Unit();
 
-    auto z1_dir_Zframe = boostToZRest(ROOT::Math::PxPyPzMVector(z1_dir.X(), z1_dir.Y(), z1_dir.Z(), 0.0));
-    auto w1_dir_Wframe = boostToWRest(ROOT::Math::PxPyPzMVector(w1_dir.X(), w1_dir.Y(), w1_dir.Z(), 0.0));
+    auto z1_dir_WZframe = boostToZRest(ROOT::Math::PxPyPzMVector(z1_dir.X(), z1_dir.Y(), z1_dir.Z(), 0.0));
+    auto w1_dir_WZframe = boostToWRest(ROOT::Math::PxPyPzMVector(w1_dir.X(), w1_dir.Y(), w1_dir.Z(), 0.0));
 
     // Compute cos(theta)
     double cosTheta = 0;
     if (fromZ == true) {
-        // cosTheta = ROOT::Math::VectorUtil::CosTheta(lepton_Zframe.Vect(), z1_dir_Zframe.Vect());
-        cosTheta = lepton_Zframe.Vect().Unit().Dot(z1_WZframe.Vect().Unit());
+        cosTheta = ROOT::Math::VectorUtil::CosTheta(lepton_Zframe.Vect(), z1_dir_WZframe.Vect());
     }
     if (fromW == true) {
-        // cosTheta = ROOT::Math::VectorUtil::CosTheta(lepton_Wframe.Vect(), w1_dir_Wframe.Vect());
-        cosTheta = lepton_Wframe.Vect().Unit().Dot(w1_WZframe.Vect().Unit());
+        cosTheta = ROOT::Math::VectorUtil::CosTheta(lepton_Wframe.Vect(), w1_dir_WZframe.Vect());
     }
     return cosTheta;
 }
@@ -143,15 +141,16 @@ bool checkMother(GenParticle * p, int motherPID, TClonesArray *branchParticle) {
 
 int main() {
 
-    bool _long = true; 
-    bool _trans = false;
+    bool _long = false; 
+    bool _trans = true;
     TFile *hfile = nullptr;
     /* Files: 
     longitudinal polarized: /afs/hep.wisc.edu/home/kmartine/Event_Generation/MG5_aMC_v3_6_7/ppToWZ_long/Events/run_01/tag_1_delphes_events.root 
     transverse polarized: /afs/hep.wisc.edu/home/kmartine/Event_Generation/MG5_aMC_v3_6_7/ppToWZ/Events/run_02/tag_1_delphes_events.root
+    Better transverse:/afs/hep.wisc.edu/home/kmartine/Event_Generation/MG5_aMC_v3_6_7/ppToWZ/Events/run_10_decayed_1/tag_1_delphes_events.root
     */
     if (_trans == true) {
-        hfile = new TFile("/afs/hep.wisc.edu/home/kmartine/Event_Generation/MG5_aMC_v3_6_7/ppToWZ/Events/run_03/tag_1_delphes_events.root");
+        hfile = new TFile("/afs/hep.wisc.edu/home/kmartine/Event_Generation/MG5_aMC_v3_6_7/ppToWZ/Events/run_10_decayed_1/tag_1_delphes_events.root");
     }
     else if (_long == true) {
         hfile = new TFile("/afs/hep.wisc.edu/home/kmartine/Event_Generation/MG5_aMC_v3_6_7/ppToWZ_long/Events/run_03/tag_1_delphes_events.root"); 
@@ -187,8 +186,8 @@ int main() {
     TH1F *hist_cosThetaZ = new TH1F("cos ThetaZ", "cos ThetaZ", 100, -1, 1);
     TH1F *hist_W = new TH1F("W Transverse Mass", "W Transverse Mass", 50, 50, 150);
     TH1F *hist_Zpt = new TH1F("Z Transverse Momentum", "Z Transverse Momentum", 50, 0, 250); 
-    TH1F *hist_Zlep1_pt = new TH1F("Muon pT", "Muon Transverse Momentum", 50, 0, 250);
-    TH1F *hist_Zlep2_pt = new TH1F("Muon pT", "Muon Transverse Momentum", 50, 0, 250);
+    TH1F *hist_Zlep1_pt = new TH1F("Muon1 pT", "Muon1 pT", 50, 0, 250);
+    TH1F *hist_Zlep2_pt = new TH1F("Muon2 pT", "Muon2 pT", 50, 0, 250);
     TH1F *hist_Wlep1_pt = new TH1F("Electron pT", "Electron Transverse Momentum", 50, 0, 250);
     std::cout << "4) Making Histograms" << std::endl;
 
