@@ -1,0 +1,19 @@
+<SAFheader>
+</SAFheader>
+
+<SampleGlobalInfo>
+# xsection     xsection_error nevents        sum_weight+    sum_weight-    
+2.873030e-02   8.476294e-05   10000          0.000000e+00   0.000000e+00   
+</SampleGlobalInfo>
+
+<FileInfo>
+"/afs/hep.wisc.edu/home/kmartine/Event_Generation/MG5_aMC_v3_6_7/ppToWZ/Events/run_13/unweighted_events.lhe.gz" # file 1 / 1
+</FileInfo>
+
+<SampleDetailedInfo>
+# xsection     xsection_error nevents        sum_weight+    sum_weight-    
+2.873030e-02   8.476294e-05   10000          0.000000e+00   0.000000e+00    # file 1 / 1
+</SampleDetailedInfo>
+
+<SAFfooter>
+</SAFfooter>
